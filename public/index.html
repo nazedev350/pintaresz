@@ -1,1 +1,330 @@
-p
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pinterest Clone - Cari Gambar</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #f0f0f0;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .logo {
+            color: #e60023;
+            font-size: 24px;
+            font-weight: bold;
+            margin-bottom: 16px;
+        }
+        
+        .search-container {
+            display: flex;
+            gap: 12px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        
+        .search-input {
+            flex: 1;
+            padding: 12px 20px;
+            border: 2px solid #ddd;
+            border-radius: 24px;
+            font-size: 16px;
+            outline: none;
+            transition: border-color 0.3s;
+        }
+        
+        .search-input:focus {
+            border-color: #e60023;
+        }
+        
+        .search-button {
+            padding: 12px 24px;
+            background: #e60023;
+            color: white;
+            border: none;
+            border-radius: 24px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .search-button:hover {
+            background: #ad081b;
+        }
+        
+        .search-button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .masonry-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 16px;
+            padding: 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .pin-card {
+            background: white;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        
+        .pin-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+        }
+        
+        .pin-image {
+            width: 100%;
+            display: block;
+            object-fit: cover;
+        }
+        
+        .pin-description {
+            padding: 12px;
+            font-size: 14px;
+            color: #333;
+            line-height: 1.4;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 18px;
+        }
+        
+        .loading-spinner {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #e60023;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 12px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .error-message {
+            text-align: center;
+            padding: 20px;
+            color: #e60023;
+            background: #ffe6e6;
+            border-radius: 8px;
+            margin: 20px;
+        }
+        
+        .welcome-message {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+        
+        .welcome-message h2 {
+            font-size: 28px;
+            margin-bottom: 12px;
+            color: #333;
+        }
+        
+        .welcome-message p {
+            font-size: 16px;
+        }
+        
+        @media (max-width: 768px) {
+            .masonry-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 12px;
+                padding: 12px;
+            }
+            
+            .search-container {
+                flex-direction: column;
+            }
+            
+            .search-input, .search-button {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">📌 Pinterest Clone</div>
+        <div class="search-container">
+            <input 
+                type="text" 
+                class="search-input" 
+                id="searchInput" 
+                placeholder="Cari gambar... (contoh: kucing, pemandangan, makanan)"
+                onkeypress="handleKeyPress(event)"
+            >
+            <button class="search-button" id="searchButton" onclick="searchImages()">
+                🔍 Cari
+            </button>
+        </div>
+    </div>
+    
+    <div id="results"></div>
+    
+    <script>
+        let currentQuery = '';
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                searchImages();
+            }
+        }
+        
+        async function searchImages() {
+            const query = document.getElementById('searchInput').value.trim();
+            const button = document.getElementById('searchButton');
+            
+            if (!query) {
+                showError('Masukkan kata kunci pencarian');
+                return;
+            }
+            
+            currentQuery = query;
+            button.disabled = true;
+            button.textContent = 'Mencari...';
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <div>Mencari gambar "${query}"...</div>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/search?q=${encodeURIComponent(query)}&limit=50`);
+                const data = await response.json();
+                
+                if (data.success && data.results.length > 0) {
+                    displayResults(data.results);
+                } else if (data.success && data.results.length === 0) {
+                    showError(`Tidak ada hasil untuk "${query}". Coba kata kunci lain.`);
+                } else {
+                    showError(data.error || 'Gagal memuat hasil pencarian');
+                }
+            } catch (error) {
+                showError('Gagal terhubung ke server. Pastikan server berjalan.');
+                console.error('Error:', error);
+            } finally {
+                button.disabled = false;
+                button.textContent = '🔍 Cari';
+            }
+        }
+        
+        function displayResults(images) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (!images || images.length === 0) {
+                showError('Tidak ada gambar yang ditemukan');
+                return;
+            }
+            
+            let html = '<div class="masonry-grid">';
+            
+            images.forEach((image, index) => {
+                if (image.url) {
+                    html += `
+                        <div class="pin-card" onclick="window.open('${image.url}', '_blank')">
+                            <img 
+                                src="${image.url}" 
+                                alt="${image.description || 'Gambar ' + (index + 1)}"
+                                class="pin-image"
+                                loading="lazy"
+                                onerror="this.parentElement.style.display='none'"
+                            >
+                            ${image.description ? `
+                                <div class="pin-description">${image.description}</div>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            });
+            
+            html += '</div>';
+            
+            // Tambahkan info jumlah hasil
+            html += `
+                <div style="text-align: center; padding: 20px; color: #666;">
+                    Menampilkan ${images.length} hasil untuk "${currentQuery}"
+                </div>
+            `;
+            
+            resultsDiv.innerHTML = html;
+        }
+        
+        function showError(message) {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <div class="error-message">
+                    <strong>❌ Error:</strong> ${message}
+                </div>
+                <div class="welcome-message">
+                    <h2>Selamat Datang di Pinterest Clone</h2>
+                    <p>Cari gambar favorit Anda dengan memasukkan kata kunci di atas</p>
+                    <p style="margin-top: 10px;">Contoh: "wallpaper hd", "kucing lucu", "desain interior"</p>
+                </div>
+            `;
+        }
+        
+        // Tampilkan pesan selamat datang saat pertama kali
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('results').innerHTML = `
+                <div class="welcome-message">
+                    <h2>📌 Selamat Datang di Pinterest Clone</h2>
+                    <p>Cari jutaan gambar inspiratif dari Pinterest</p>
+                    <p style="margin-top: 15px;">
+                        <small>Masukkan kata kunci pencarian dan tekan Enter atau klik Cari</small>
+                    </p>
+                    <div style="margin-top: 30px;">
+                        <button onclick="document.getElementById('searchInput').value='wallpaper aesthetic'; searchImages()" 
+                                style="margin:5px; padding:8px 16px; border:1px solid #ddd; border-radius:20px; cursor:pointer; background:white;">
+                            🎨 Wallpaper Aesthetic
+                        </button>
+                        <button onclick="document.getElementById('searchInput').value='kucing lucu'; searchImages()" 
+                                style="margin:5px; padding:8px 16px; border:1px solid #ddd; border-radius:20px; cursor:pointer; background:white;">
+                            🐱 Kucing Lucu
+                        </button>
+                        <button onclick="document.getElementById('searchInput').value='desain interior'; searchImages()" 
+                                style="margin:5px; padding:8px 16px; border:1px solid #ddd; border-radius:20px; cursor:pointer; background:white;">
+                            🏠 Desain Interior
+                        </button>
+                    </div>
+                </div>
+            `;
+        });
+    </script>
+</body>
+</html>
